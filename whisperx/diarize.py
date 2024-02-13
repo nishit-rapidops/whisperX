@@ -12,20 +12,24 @@ class DiarizationPipeline:
         self,
         model_name="pyannote/speaker-diarization-3.1",
         use_auth_token=None,
-        device: Optional[Union[str, torch.device]] = "cpu",
+        device: Optional[Union[str, torch.device]] = "cpu"
     ):
         if isinstance(device, str):
             device = torch.device(device)
         self.model = Pipeline.from_pretrained(model_name, use_auth_token=use_auth_token).to(device)
 
-    def __call__(self, audio: Union[str, np.ndarray], num_speakers=None, min_speakers=None, max_speakers=None):
+    def __call__(self, audio: Union[str, np.ndarray], num_speakers=None, min_speakers=None, max_speakers=None, return_embeddings=False):
         if isinstance(audio, str):
             audio = load_audio(audio)
         audio_data = {
             'waveform': torch.from_numpy(audio[None, :]),
             'sample_rate': SAMPLE_RATE
         }
-        segments, embeddings = self.model(audio_data, num_speakers = num_speakers, min_speakers=min_speakers, max_speakers=max_speakers, return_embeddings=True)
+        embeddings = []
+        if return_embeddings:
+            segments, embeddings = self.model(audio_data, num_speakers = num_speakers, min_speakers=min_speakers, max_speakers=max_speakers, return_embeddings=return_embeddings)
+        else:
+            segments = self.model(audio_data, num_speakers = num_speakers, min_speakers=min_speakers, max_speakers=max_speakers, return_embeddings=return_embeddings)
         diarize_df = pd.DataFrame(segments.itertracks(yield_label=True), columns=['segment', 'label', 'speaker'])
         diarize_df['start'] = diarize_df['segment'].apply(lambda x: x.start)
         diarize_df['end'] = diarize_df['segment'].apply(lambda x: x.end)
